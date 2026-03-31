@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RJ Foundation - Admin Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 20px;">
+
+<div style="max-width: 1000px; margin: 0 auto; background: white; height: 90vh; border-radius: 20px; display: flex; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+    
+    <div style="width: 30%; background: #f8f9fa; border-right: 1px solid #eee; overflow-y: auto;">
+        <div style="padding: 20px; background: #00796b; color: white; font-weight: bold;">ইনবক্স</div>
+        <div id="user-list-area">
+            <p style="text-align: center; color: #888; margin-top: 20px;">লোডিং হচ্ছে...</p>
+        </div>
+    </div>
+
+    <div style="width: 70%; display: flex; flex-direction: column;">
+        <div id="chat-header" style="padding: 18px; border-bottom: 1px solid #eee; font-weight: bold; color: #00796b;">
+            ইউজার সিলেক্ট করুন
+        </div>
+        
+        <div id="admin-messages" style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #fff;">
+            <p style="text-align: center; color: #bbb; margin-top: 100px;">বস্, বাম পাশ থেকে কাউকে সিলেক্ট করে চ্যাট শুরু কর!</p>
+        </div>
+
+        <div id="reply-box" style="padding: 20px; border-top: 1px solid #eee; display: none;">
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="admin-reply-input" placeholder="আপনার উত্তর লিখুন..." style="flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 10px; outline: none;">
+                <button onclick="sendAdminReply()" style="background: #00796b; color: white; border: none; padding: 0 25px; border-radius: 10px; cursor: pointer; font-weight: bold;">পাঠান</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+    // তোর দেওয়া রিয়েল কনফিগ
+    const firebaseConfig = {
+        apiKey: "AIzaSyAd0K18nLhmDsljRZuk4wvn9wPtHyuc7cM",
+        authDomain: "rj-chats1.firebaseapp.com",
+        projectId: "rj-chats1",
+        storageBucket: "rj-chats1.firebasestorage.app",
+        messagingSenderId: "464542067879",
+        appId: "1:464542067879:web:7c47353045bf5c7362bf82",
+        databaseURL: "https://rj-chats1-default-rtdb.firebaseio.com/"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    let currentRoom = "";
+
+    // ১. ইউজার লিস্ট লোড করা
+    db.ref("private_chats").on("value", (snapshot) => {
+        const listArea = document.getElementById('user-list-area');
+        listArea.innerHTML = "";
+        
+        snapshot.forEach((child) => {
+            const roomID = child.key;
+            const email = roomID.replace(/,/g, '.');
+            
+            const div = document.createElement('div');
+            div.innerHTML = `<i class="fas fa-user-circle"></i> ${email}`;
+            div.style = "padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: 0.3s;";
+            div.onclick = () => openChat(roomID, email);
+            div.onmouseover = () => div.style.background = "#e0f2f1";
+            div.onmouseout = () => div.style.background = "transparent";
+            listArea.appendChild(div);
+        });
+    });
+
+    // ২. চ্যাট ওপেন করা
+    function openChat(roomID, email) {
+        currentRoom = roomID;
+        document.getElementById('chat-header').innerHTML = `<i class="fas fa-envelope-open-text"></i> ${email}-এর সাথে কথা বলছেন`;
+        document.getElementById('reply-box').style.display = "block";
+        const msgArea = document.getElementById('admin-messages');
+        msgArea.innerHTML = "";
+
+        db.ref("private_chats/" + roomID).off(); // পুরাতন কানেকশন বন্ধ
+        db.ref("private_chats/" + roomID).on("child_added", (snap) => {
+            const data = snap.val();
+            const isAdmin = data.sender === "admin";
+            
+            const msgHtml = `
+                <div style="align-self: ${isAdmin ? 'flex-end' : 'flex-start'}; 
+                            background: ${isAdmin ? '#00796b' : '#e9ecef'}; 
+                            color: ${isAdmin ? '#fff' : '#333'}; 
+                            padding: 10px 15px; border-radius: 15px; max-width: 75%; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                    ${data.text}
+                </div>
+            `;
+            msgArea.innerHTML += msgHtml;
+            msgArea.scrollTop = msgArea.scrollHeight;
+        });
+    }
+
+    // ৩. রিপ্লাই পাঠানো
+    function sendAdminReply() {
+        const input = document.getElementById('admin-reply-input');
+        const text = input.value.trim();
+        if(text && currentRoom) {
+            db.ref("private_chats/" + currentRoom).push({
+                sender: "admin",
+                text: text,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+            input.value = "";
+        }
+    }
+</script>
+</body>
+</html>
